@@ -100,6 +100,7 @@ class Goreport(object):
     report_format = None
     output_word_report = None
     output_xlsx_report = None
+    output_containing_folder = ''
     xlsx_header_bg_color = "#0085CA"
     xlsx_header_font_color = "#FFFFFF"
 
@@ -119,14 +120,17 @@ class Goreport(object):
             print("L.. Details: {}".format(e))
             sys.exit()
 
+        conf_section_gophish = self.config_section_map(config, 'Gophish')
         try:
             # Read in the values from the config file
-            GP_HOST = self.config_section_map(config, 'Gophish')['gp_host']
-            API_KEY = self.config_section_map(config, 'Gophish')['api_key']
+            GP_HOST = conf_section_gophish['gp_host']
+            API_KEY = conf_section_gophish['api_key']
         except Exception as e:
             print("[!] There was a problem reading values from the gophish.config file!")
             print("L.. Details: {}".format(e))
             sys.exit()
+
+        self.output_containing_folder = conf_section_gophish.get('output_folder', '')
 
         try:
             # Read in the values from the config file
@@ -601,13 +605,23 @@ Make sure your URL and API key are correct. Check HTTP vs HTTPS!".format(CAM_ID)
 
     def _build_output_xlsx_file_name(self):
         """Create the xlsx report name."""
-        xlsx_report = "Gophish Results for {}.xlsx".format(self.cam_name)
+        prefix = self._build_output_path_prefix()
+        xlsx_report = f'{prefix}Gophish Results for {self.cam_name}.xlsx'
         return xlsx_report
 
     def _build_output_word_file_name(self):
         """Create the docx report name."""
-        word_report = "Gophish Results for {}.docx".format(self.cam_name)
+        prefix = self._build_output_path_prefix()
+        word_report = f'{prefix}Gophish Results for {self.cam_name}.docx'
         return word_report
+
+    def _build_output_path_prefix(self):
+        prefix = ''
+        if self.output_containing_folder:
+            prefix = f'{self.output_containing_folder}{os.path.sep}'
+            if not os.path.isdir(prefix):
+                raise Exception(f'Output path {prefix} specified in the configuration does not exist')
+        return prefix
 
     def _set_word_column_width(self, column, width):
         """Custom function for quickly and easily setting the width of a table's column in the Word
