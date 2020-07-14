@@ -31,6 +31,8 @@ from docx.oxml.shared import OxmlElement, qn
 # Basic imports
 import sys
 import configparser
+from faker import Faker
+from collections import defaultdict
 import time
 # Imports for web requests, e.g. Google Maps API for location data
 # Disables the insecure HTTPS warning for the self-signed GoPpish certs
@@ -103,6 +105,7 @@ class Goreport(object):
     output_containing_folder = ''
     xlsx_header_bg_color = "#0085CA"
     xlsx_header_font_color = "#FFFFFF"
+    anonymize_pii = False
 
     def __init__(self, report_format, config_file, google, verbose):
         """Initiate the connection to the Gophish server with the provided host,
@@ -131,6 +134,7 @@ class Goreport(object):
             sys.exit()
 
         self.output_containing_folder = conf_section_gophish.get('output_folder', '')
+        self.anonymize_pii = conf_section_gophish.get('anonymize', False)
 
         try:
             # Read in the values from the config file
@@ -461,6 +465,11 @@ Make sure your URL and API key are correct. Check HTTP vs HTTPS!".format(CAM_ID)
         The results model can provide:
         first_name, last_name, email, position, and IP address
         """
+        if self.anonymize_pii:
+            fake = Faker()
+            names = defaultdict(fake.first_name)
+            surnames = defaultdict(fake.last_name)
+            emails = defaultdict(fake.email)
         # Total length of results gives us the total number of targets
         if combine_reports and self.total_targets is None:
             self.total_targets = len(self.campaign.results)
@@ -479,9 +488,9 @@ Make sure your URL and API key are correct. Check HTTP vs HTTPS!".format(CAM_ID)
                 self.ip_addresses.append(target.ip)
                 self.geolocate(target, target.ip, self.google)
             # Add all of the recipient's details and results to the temp dictionary
-            temp_dict["email"] = target.email
-            temp_dict["fname"] = target.first_name
-            temp_dict["lname"] = target.last_name
+            temp_dict["email"] = emails[target.email] if self.anonymize_pii else target.email
+            temp_dict["fname"] = names[target.first_name] if self.anonymize_pii else target.first_name
+            temp_dict["lname"] = surnames[target.last_name] if self.anonymize_pii else target.last_name
             temp_dict["ip_address"] = target.ip
             # Check if this target was recorded as viewing the email (tracking image)
             if target.email in self.targets_opened:
