@@ -165,6 +165,12 @@ class Goreport(object):
         print("L.. The API Authorization endpoint is: {}/api/campaigns/?api_key={}".format(GP_HOST, API_KEY))
         self.api = Gophish(API_KEY, host=GP_HOST, verify=False)
 
+        if self.anonymize_pii:
+            fake = Faker()
+            self.names = defaultdict(fake.first_name)
+            self.surnames = defaultdict(fake.last_name)
+            self.emails = defaultdict(fake.email)
+
     def run(self, id_list, combine_reports, set_complete_status):
         """Run everything to process the target campaign."""
         # Output some feedback for user options
@@ -465,11 +471,6 @@ Make sure your URL and API key are correct. Check HTTP vs HTTPS!".format(CAM_ID)
         The results model can provide:
         first_name, last_name, email, position, and IP address
         """
-        if self.anonymize_pii:
-            fake = Faker()
-            names = defaultdict(fake.first_name)
-            surnames = defaultdict(fake.last_name)
-            emails = defaultdict(fake.email)
         # Total length of results gives us the total number of targets
         if combine_reports and self.total_targets is None:
             self.total_targets = len(self.campaign.results)
@@ -488,9 +489,13 @@ Make sure your URL and API key are correct. Check HTTP vs HTTPS!".format(CAM_ID)
                 self.ip_addresses.append(target.ip)
                 self.geolocate(target, target.ip, self.google)
             # Add all of the recipient's details and results to the temp dictionary
-            temp_dict["email"] = emails[target.email] if self.anonymize_pii else target.email
-            temp_dict["fname"] = names[target.first_name] if self.anonymize_pii else target.first_name
-            temp_dict["lname"] = surnames[target.last_name] if self.anonymize_pii else target.last_name
+            if self.anonymize_pii:
+                target.email = self.emails[target.email]
+                target.first_name = self.names[target.first_name]
+                target.last_name = self.surnames[target.last_name]
+            temp_dict["email"] = target.email
+            temp_dict["fname"] = target.first_name
+            temp_dict["lname"] = target.last_name
             temp_dict["ip_address"] = target.ip
             # Check if this target was recorded as viewing the email (tracking image)
             if target.email in self.targets_opened:
@@ -533,6 +538,8 @@ Make sure your URL and API key are correct. Check HTTP vs HTTPS!".format(CAM_ID)
         submitted_counter = 0
         # Run through all events and count each of the four basic events
         for event in self.campaign.timeline:
+            if self.anonymize_pii:
+                event.email = self.emails[event.email]
             if event.message == "Email Sent":
                 sent_counter += 1
             elif event.message == "Email Opened":
